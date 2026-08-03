@@ -78,7 +78,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
     const onWaiting = () => setIsBuffering(true);
     const onPlaying = () => setIsBuffering(false);
-    const onEnded = () => handleEnded();
+    const onEnded = () => handleEndedRef.current();
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
 
@@ -147,6 +147,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     advance(1);
   }
+
+  // The mount-only effect above registers `onEnded` once, so it can't close
+  // over fresh `repeatMode`/`advance` values on later renders. Keeping a
+  // ref updated every render lets that one-time listener always call the
+  // current logic instead of whatever was true on first mount.
+  const handleEndedRef = useRef(handleEnded);
+  useEffect(() => {
+    handleEndedRef.current = handleEnded;
+  });
 
   const playQueue = useCallback((songs: Song[], startIndex = 0) => {
     setOriginalQueue(songs);
