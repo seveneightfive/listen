@@ -145,9 +145,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
+    // The browser fires a native `pause` event right before `ended` when a
+    // track finishes on its own (per the HTML5 media spec) — our `onPause`
+    // listener turns that into setIsPlaying(false), which is correct for a
+    // real user pause but wrong here, since we're about to continue to the
+    // next track. Re-assert `true`; if `advance` finds nothing left to play
+    // (last track, repeat off), it calls setIsPlaying(false) itself right
+    // after this and that call wins instead.
+    setIsPlaying(true);
     advance(1);
   }
-
   // The mount-only effect above registers `onEnded` once, so it can't close
   // over fresh `repeatMode`/`advance` values on later renders. Keeping a
   // ref updated every render lets that one-time listener always call the
