@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* --- Design tokens ---------------------------------------------- */
+  /* Warm, ink-dark palette — a record-label / tape-deck feel rather
+     than a generic dark-mode dashboard. */
+  --ink: #15130f; /* page background */
+  --surface: #1e1b15; /* mini player / drawers */
+  --surface-2: #262219; /* recessed panels, empty artwork */
+  --accent: #e8a33d; /* marigold — primary controls */
+  --accent-2: #6e8c6c; /* moss green — event tag, secondary accents */
+  --text: #f5f1e6;
+  --text-muted: #93897a;
+}
+
+* {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* --- Scrub / volume sliders ----------------------------------------
+   A single flat track filled up to `--pct` (set inline per-instance),
+   with a small accent thumb — tape-counter styling rather than the
+   default OS slider chrome. */
+input[type="range"].player-scrub,
+input[type="range"].player-volume {
+  --pct: 0%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--pct),
+    rgba(255, 255, 255, 0.12) var(--pct),
+    rgba(255, 255, 255, 0.12) 100%
+  );
+}
+
+input[type="range"].player-volume {
+  background: linear-gradient(
+    to right,
+    var(--text-muted) 0%,
+    var(--text-muted) var(--pct, 60%),
+    rgba(255, 255, 255, 0.12) var(--pct, 60%),
+    rgba(255, 255, 255, 0.12) 100%
+  );
+}
+
+input[type="range"].player-scrub::-webkit-slider-thumb,
+input[type="range"].player-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+input[type="range"].player-scrub::-moz-range-thumb,
+input[type="range"].player-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--text);
+  cursor: pointer;
+}
+
+/* Respect reduced-motion preferences for the seek-ring transition. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
