@@ -119,6 +119,45 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume;
   }, [volume, isMuted]);
 
+  // Push real metadata to the OS/car stereo whenever the track changes, and
+// wire hardware/Bluetooth transport buttons (car stereo, headphones,
+// lock screen) to our own controls. Without this, Media Session has
+// nothing to show and falls back to generic page info.
+useEffect(() => {
+  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+  if (!currentSong) {
+    navigator.mediaSession.metadata = null;
+    return;
+  }
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: currentSong.title ?? "Untitled",
+    artist: currentSong.artist?.name ?? "Unknown artist",
+    album: currentSong.album_name ?? undefined,
+    artwork: currentSong.cover_image_url
+      ? [
+          { src: currentSong.cover_image_url, sizes: "512x512", type: "image/jpeg" },
+        ]
+      : [],
+  });
+}, [currentSong]);
+
+useEffect(() => {
+  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+  navigator.mediaSession.setActionHandler("play", () => togglePlay());
+  navigator.mediaSession.setActionHandler("pause", () => togglePlay());
+  navigator.mediaSession.setActionHandler("previoustrack", () => prev());
+  navigator.mediaSession.setActionHandler("nexttrack", () => next());
+  navigator.mediaSession.setActionHandler("seekto", (details) => {
+    if (details.seekTime != null) seek(details.seekTime);
+  });
+}, [togglePlay, prev, next, seek]);
+
+useEffect(() => {
+  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+  navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+}, [isPlaying]);
+
   const advance = useCallback(
     (direction: 1 | -1) => {
       setPointer((p) => {
