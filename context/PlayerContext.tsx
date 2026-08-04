@@ -37,20 +37,6 @@ interface PlayerContextValue {
   cycleRepeat: () => void;
 }
 
-// Count a play once per track, the first time it actually starts —
-// not on every pause/resume of the same song.
-const countedSongIdRef = useRef<number | null>(null);
-useEffect(() => {
-  if (!currentSong || !isPlaying) return;
-  if (countedSongIdRef.current === currentSong.id) return;
-  countedSongIdRef.current = currentSong.id;
-  supabase
-    .rpc("increment_song_play_count", { song_id_input: currentSong.id })
-    .then(({ error }) => {
-      if (error) console.error("increment_song_play_count error:", error.message);
-    });
-}, [currentSong, isPlaying]);
-
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 function shuffledOrder(length: number, keepFirst: number) {
@@ -135,43 +121,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [volume, isMuted]);
 
   // Push real metadata to the OS/car stereo whenever the track changes, and
-// wire hardware/Bluetooth transport buttons (car stereo, headphones,
-// lock screen) to our own controls. Without this, Media Session has
-// nothing to show and falls back to generic page info.
-useEffect(() => {
-  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-  if (!currentSong) {
-    navigator.mediaSession.metadata = null;
-    return;
-  }
+  // wire hardware/Bluetooth transport buttons (car stereo, headphones,
+  // lock screen) to our own controls. Without this, Media Session has
+  // nothing to show and falls back to generic page info.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    if (!currentSong) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
 
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: currentSong.title ?? "Untitled",
-    artist: currentSong.artist?.name ?? "Unknown artist",
-    album: currentSong.album_name ?? undefined,
-    artwork: currentSong.cover_image_url
-      ? [
-          { src: currentSong.cover_image_url, sizes: "512x512", type: "image/jpeg" },
-        ]
-      : [],
-  });
-}, [currentSong]);
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.title ?? "Untitled",
+      artist: currentSong.artist?.name ?? "Unknown artist",
+      album: currentSong.album_name ?? undefined,
+      artwork: currentSong.cover_image_url
+        ? [{ src: currentSong.cover_image_url, sizes: "512x512", type: "image/jpeg" }]
+        : [],
+    });
+  }, [currentSong]);
 
-useEffect(() => {
-  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-  navigator.mediaSession.setActionHandler("play", () => togglePlay());
-  navigator.mediaSession.setActionHandler("pause", () => togglePlay());
-  navigator.mediaSession.setActionHandler("previoustrack", () => prev());
-  navigator.mediaSession.setActionHandler("nexttrack", () => next());
-  navigator.mediaSession.setActionHandler("seekto", (details) => {
-    if (details.seekTime != null) seek(details.seekTime);
-  });
-}, [togglePlay, prev, next, seek]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
 
-useEffect(() => {
-  if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
-  navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-}, [isPlaying]);
+  // Count a play once per track, the first time it actually starts —
+  // not on every pause/resume of the same song.
+  const countedSongIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!currentSong || !isPlaying) return;
+    if (countedSongIdRef.current === currentSong.id) return;
+    countedSongIdRef.current = currentSong.id;
+    supabase
+      .rpc("increment_song_play_count", { song_id_input: currentSong.id })
+      .then(({ error }) => {
+        if (error) console.error("increment_song_play_count error:", error.message);
+      });
+  }, [currentSong, isPlaying]);
 
   const advance = useCallback(
     (direction: 1 | -1) => {
@@ -209,6 +196,7 @@ useEffect(() => {
     setIsPlaying(true);
     advance(1);
   }
+
   // The mount-only effect above registers `onEnded` once, so it can't close
   // over fresh `repeatMode`/`advance` values on later renders. Keeping a
   // ref updated every render lets that one-time listener always call the
@@ -286,6 +274,21 @@ useEffect(() => {
   const cycleRepeat = useCallback(() => {
     setRepeatMode((m) => (m === "off" ? "all" : m === "all" ? "one" : "off"));
   }, []);
+
+  // Wire hardware/Bluetooth transport buttons (car stereo, headphones, lock
+  // screen) to our own controls. Placed after togglePlay/prev/next/seek are
+  // defined above, since referencing a `const` before its declaration in
+  // the same function throws (temporal dead zone).
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.setActionHandler("play", () => togglePlay());
+    navigator.mediaSession.setActionHandler("pause", () => togglePlay());
+    navigator.mediaSession.setActionHandler("previoustrack", () => prev());
+    navigator.mediaSession.setActionHandler("nexttrack", () => next());
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (details.seekTime != null) seek(details.seekTime);
+    });
+  }, [togglePlay, prev, next, seek]);
 
   const value = useMemo<PlayerContextValue>(
     () => ({
