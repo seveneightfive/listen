@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import type { RepeatMode, Song } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
 
 interface PlayerContextValue {
   queue: Song[];
@@ -35,6 +36,20 @@ interface PlayerContextValue {
   toggleShuffle: () => void;
   cycleRepeat: () => void;
 }
+
+// Count a play once per track, the first time it actually starts —
+// not on every pause/resume of the same song.
+const countedSongIdRef = useRef<number | null>(null);
+useEffect(() => {
+  if (!currentSong || !isPlaying) return;
+  if (countedSongIdRef.current === currentSong.id) return;
+  countedSongIdRef.current = currentSong.id;
+  supabase
+    .rpc("increment_song_play_count", { song_id_input: currentSong.id })
+    .then(({ error }) => {
+      if (error) console.error("increment_song_play_count error:", error.message);
+    });
+}, [currentSong, isPlaying]);
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
